@@ -1,0 +1,25 @@
+# Apple firmware images - never commit (copyrighted, keep local only)
+firmware/
+*.MSE
+
+# Vendored upstream tools (reference as credits / submodules instead)
+wInd3x/
+ipod_sun/
+msys64/
+rust/
+tools/
+downloads/
+pyenv/
+gocache/
+gopath/
+
+# Build output and caches
+out/
+build/
+*.log
+*.tmp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
