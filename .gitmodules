@@ -1,0 +1,6 @@
+[submodule "ipod_sun"]
+	path = ipod_sun
+	url = https://github.com/CUB3D/ipod_sun
+[submodule "wInd3x"]
+	path = wInd3x
+	url = https://github.com/freemyipod/wInd3x
