@@ -2,9 +2,7 @@
 firmware/
 *.MSE
 
-# Vendored upstream tools (reference as credits / submodules instead)
-wInd3x/
-ipod_sun/
+# Toolchains and caches (not part of this repo)
 msys64/
 rust/
 tools/
@@ -13,9 +11,10 @@ pyenv/
 gocache/
 gopath/
 
-# Build output and caches
+# Build output
 out/
 build/
+target/
 *.log
 *.tmp
 
