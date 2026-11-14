@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="iPod nano 7G - Custom Firmware" width="100%">
+</p>
+
 # iPod nano 7G - Custom Firmware
 
 A reproducible way to repack and reflash the iPod nano 7th generation's own
