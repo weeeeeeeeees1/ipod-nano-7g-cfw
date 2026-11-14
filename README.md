@@ -1,147 +1,148 @@
-# IPOD NANO 7G CUSTOM FIRMWARE, DEV IN PROGRESS!
-
 <p align="center">
-  <a href="#install-start-here"><strong>INSTALL</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#how-it-works"><strong>HOW IT WORKS</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#current-status"><strong>STATUS</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#report-a-bug"><strong>REPORT A BUG</strong></a>
+  <img src="assets/banner.png" alt="iPod nano 7G - Custom Firmware" width="100%">
 </p>
 
-Custom firmware for the Apple iPod nano 7th generation, built by repacking the
-stock firmware image and installing it over USB with the freemyipod toolchain.
-This is not a jailbreak of a phone and it is not an emulator. It runs on the
-iPod's own hardware.
+# iPod nano 7G - Custom Firmware
 
-No Apple firmware is included in this repository. You must provide your own
-firmware image, dumped or downloaded from your own device. The build process
-repacks that image locally and never redistributes Apple code.
+A reproducible way to repack and reflash the iPod nano 7th generation's own
+firmware on a device you own. This is not an emulator and it is not a phone
+jailbreak - the modified image runs on the nano's native hardware.
 
-## Device target
+Status: work in progress. Tested against one specific stock build; treat
+everything here as experimental.
 
-- Apple iPod nano 7th generation
-- Model: MD477LL (2012)
-- Stock firmware: 1.1.2, build 39A10023
+Jump to: [Flashing](#flashing-the-image) - [If DFU will not engage](#if-dfu-will-not-engage) - [Building](#building-the-image) - [Restoring stock](#restoring-stock) - [Open an issue](#feedback)
 
-Other Nano 7G models and builds are untested. The repack and install steps are
-specific to this build, so a different firmware version may need its own
-offsets and verification.
+---
 
-## Install: start here
+## What this is
 
-This is experimental software for a device you own. Back up your original
-firmware before you begin. The modified image differs from stock only in
-resources; no signed executable code is changed.
+The stock firmware image is unpacked, its resources are modified, and it is
+repacked and written back over USB. No signed executable is touched, so the
+image still clears the checks the device runs when it installs an update. The
+whole point is a build that someone else can reproduce from their own firmware
+dump, rather than a prebuilt binary you have to trust.
 
-1. Dump or obtain the stock firmware for your exact model and build.
-2. Keep an untouched copy as `firmware/Firmware.MSE`. This is your recovery
-   image. Do not overwrite it.
-3. Build the repacked image (see Build below). The result is
-   `ipod_sun/Firmware-repack.MSE`.
-4. Put the iPod into DFU mode and install the repacked image with wInd3x.
-5. Let the device reboot into the custom firmware.
+Apple's firmware is never included here. You bring your own image, dumped from
+or matching your own device, and the build repacks it locally.
 
-If anything goes wrong, reinstall your original `Firmware.MSE` the same way.
+## Target device
 
-## How it works
+This is tuned for one configuration and nothing else:
 
-This project stands on two upstream homebrew tools and adds a documented,
-reproducible build for one specific Nano 7G build.
+| | |
+|---|---|
+| Device | iPod nano 7th generation |
+| Model | MD477LL (2012) |
+| Stock build | 1.1.2 (39A10023) |
 
-1. The stock `Firmware.MSE` is unpacked and its resources are modified. No
-   signed executable is replaced, so the image still passes the checks the
-   device performs at install time.
-2. The modified resources are repacked into `Firmware-repack.MSE`.
-3. The device is placed in DFU mode and the repacked image is sent over USB
-   with wInd3x, which handles the Nano 7G recovery protocol.
-4. The original `Firmware.MSE` is kept as a known-good recovery image so the
-   device can always be returned to stock.
+A different model or build will likely need its own offsets and its own
+verification pass before any of this is safe to try.
 
-The toolchain runs on Windows with MSYS2 and a pinned Rust nightly. Exact
-versions are listed under Build so the result is reproducible.
+## Before you touch anything
 
-## Current status
+Read this section twice. The order matters.
 
-> Fill these in to match your device. Keep claims to what you have actually
-> verified on hardware.
+- Dump your stock firmware and keep an untouched copy as
+  `firmware/Firmware.MSE`. This is your way back. Do not let the build or
+  anything else overwrite it.
+- Confirm your build string really is `39A10023` before flashing a repack
+  built for it.
+- A healthy power path matters here. A dead battery can stop the nano from
+  reaching the state the flash needs, even on USB power (see below).
 
-- [ ] Original firmware backed up and verified
-- [ ] Repacked image builds reproducibly
-- [ ] Device enters DFU mode reliably
-- [ ] Repacked image installs over USB
-- [ ] Device boots the custom firmware
-- [ ] Recovery to stock confirmed working
+## Flashing the image
 
-### Known blocker
+Once you have a verified repack (`ipod_sun/Firmware-repack.MSE`) and your stock
+backup safely aside:
 
-DFU entry currently fails on this unit. The observed sequence is: screen goes
-black, Apple logo appears, screen goes black again, then the device boots
-normally, while Windows disconnects and reconnects the USB device. The battery
-on this unit is dead, and the ipod_sun notes mention that a nonfunctional
-battery can prevent some devices from entering DFU even while connected to USB
-power. Diagnosing this is the current priority. See
+1. Connect the nano to the machine over USB.
+2. Put it into DFU mode.
+3. Send the repacked image with wInd3x.
+4. Wait for the device to come back up on the new firmware.
+5. If anything looks wrong, flash `firmware/Firmware.MSE` the same way to return
+   to stock.
+
+## If DFU will not engage
+
+This is the live blocker on the test unit, so it gets its own section.
+
+What happens now: holding the button combo makes the screen go dark, the Apple
+logo shows, the screen goes dark a second time, and then the nano just boots
+normally. Windows drops and re-adds the USB device somewhere in the middle. Held
+for a full minute, it still ends up booting normally.
+
+The working theory is power, not buttons. The battery on this unit is dead, and
+the ipod_sun notes call out that a non-working battery can keep some devices out
+of DFU even while USB is connected. The next useful step is to watch whether
+Windows ever enumerates the DFU USB identity during those brief dark moments,
+rather than only seeing an ordinary reboot. Notes and findings live in
 [docs/DFU_NOTES.md](docs/DFU_NOTES.md).
 
-## Requirements
+## Toolchain
 
-- Windows with MSYS2
-- Rust nightly-2023-12-20
-- wInd3x
-- A USB cable and the target iPod nano 7G
-- Your own stock firmware image for the matching build
+| Piece | Used for |
+|---|---|
+| MSYS2 | Unix-style build environment on Windows |
+| Rust nightly-2023-12-20 | Pinned toolchain for the repack tooling |
+| wInd3x | DFU transfer / nano recovery over USB |
+| Your stock `Firmware.MSE` | Input image, supplied by you |
 
-## Build
+## Building the image
 
-The working layout for this project:
+Working layout:
 
 ```text
-msys64/                       MSYS2 environment
-iPodLinux/rust/               pinned Rust nightly toolchain
-iPodLinux/wInd3x/             wInd3x build / executable
-iPodLinux/ipod_sun/           repack project and Firmware-repack.MSE
-iPodLinux/firmware/           original Firmware.MSE (recovery image, untracked)
-iPodLinux/tools/              read-only diagnostic tools
+msys64/              MSYS2 environment
+rust/                pinned Rust nightly
+wInd3x/              wInd3x build or binary
+ipod_sun/            repack project, produces Firmware-repack.MSE
+firmware/            your stock Firmware.MSE (kept local, never committed)
+tools/               read-only diagnostics
 ```
 
-Build steps:
+Rough flow:
 
-1. Install MSYS2 and the pinned Rust nightly.
-2. Build or place the wInd3x executable.
-3. Supply your own `firmware/Firmware.MSE`.
+1. Set up MSYS2 and the pinned Rust nightly.
+2. Build or drop in the wInd3x binary.
+3. Provide your own `firmware/Firmware.MSE`.
 4. Run the ipod_sun repack to produce `ipod_sun/Firmware-repack.MSE`.
-5. Install with wInd3x from DFU mode.
+5. Flash it from DFU as described above.
 
-The original firmware image and the repacked output stay local to your machine
-and are never committed. See `.gitignore`.
+Your stock image and the repacked output both stay on your machine. See
+`.gitignore`.
 
-## Report a bug
+## Restoring stock
 
-Open an issue with your exact model, firmware build, host OS, the step that
-failed, and what you observed. For DFU problems, include whether Windows
-detected a DFU USB identity during the attempt.
+Keep `firmware/Firmware.MSE` untouched for exactly this. If a flash goes wrong
+or you simply want to go back, put the device in DFU and write that original
+image with wInd3x. That is the recovery path, so protect that file.
 
-## Credits
+## Feedback
 
-### CUB3D, ipod_sun
+Opening an issue is the fastest way to get help. Please include your model and
+exact build string, your host OS, which step failed, and what you saw. For DFU
+problems specifically, say whether the host ever detected a DFU USB identity
+during the attempt - that single detail decides most of the diagnosis.
 
-The [ipod_sun](https://github.com/CUB3D/ipod_sun) project provides the firmware
-repack approach this build is based on.
+## Thanks and sources
 
-### freemyipod, wInd3x
+This project leans on two homebrew efforts and credits them plainly.
 
-[wInd3x](https://github.com/freemyipod/wInd3x) provides the Nano 7G DFU and USB
-recovery tooling used to install the image, and the freemyipod project's
-research underpins Nano-generation homebrew in general.
+- [ipod_sun](https://github.com/CUB3D/ipod_sun) by CUB3D - the firmware repack
+  approach this build follows.
+- [wInd3x](https://github.com/freemyipod/wInd3x) by freemyipod - the nano DFU
+  and USB recovery tooling used to install the image, plus the broader
+  freemyipod research the nano scene rests on.
 
-Thank you to everyone in the iPod homebrew community whose reverse engineering,
-testing, and open source work made this possible.
+Thanks to everyone in the iPod homebrew community whose reverse engineering and
+testing made any of this possible.
 
-## Legal
+## Disclaimer
 
-This is an unofficial homebrew project for hardware you own. It is not
-affiliated with Apple Inc. iPod and related names belong to their respective
-owners. This repository does not contain Apple firmware, bootloader code, or
-other copyrighted Apple data. You are responsible for only using firmware
-images you are entitled to use.
+This is an unofficial homebrew project for hardware you own, with no affiliation
+to Apple Inc. iPod and related marks belong to their owners. Nothing in this
+repository contains Apple firmware, bootloader code, or other copyrighted Apple
+data; you are responsible for using only firmware images you are entitled to
+use. Flashing firmware carries a real risk of bricking the device, and that risk
+is yours.
