@@ -1,0 +1,52 @@
+diff --git a/emulator/machine/hw/arm/nano7.c b/emulator/machine/hw/arm/nano7.c
+index bb1ea84..a6db8b9 100644
+--- a/emulator/machine/hw/arm/nano7.c
++++ b/emulator/machine/hw/arm/nano7.c
+@@ -202,17 +202,17 @@ static void nano7_resume_hw(void)
+      * completion; it never restarts the channel itself (Session 27).
+      * Reload the channel from that descriptor and run it. */
+     {
+-        uint32_t d[5], i;
++        uint32_t d[5], word;
+ 
+-        for (i = 0; i < 5; i++) {
+-            d[i] = address_space_ldl_le(as, 0x0b3539c0 + 4 * i,
+-                                        MEMTXATTRS_UNSPECIFIED, NULL);
++        for (word = 0; word < 5; word++) {
++            d[word] = address_space_ldl_le(as, 0x0b3539c0 + 4 * word,
++                                          MEMTXATTRS_UNSPECIFIED, NULL);
+         }
+         if (d[1] == 0x3ca00010) {
+             static const hwaddr reg[5] = { 0x00, 0x04, 0x08, 0x0c, 0x14 };
+ 
+-            for (i = 0; i < 5; i++) {
+-                address_space_stl_le(as, 0x38200140 + reg[i], d[i],
++            for (word = 0; word < 5; word++) {
++                address_space_stl_le(as, 0x38200140 + reg[word], d[word],
+                                      MEMTXATTRS_UNSPECIFIED, NULL);
+             }
+             /* mem -> periph, destination request 0xc (I2S0 TX), run */
+@@ -374,7 +374,7 @@ static void nano7_pcsample_tick(void *opaque)
+             address_space_read(&address_space_memory, sptr + 0x24,
+                                MEMTXATTRS_UNSPECIFIED, &s24, 4);
+         }
+-        fprintf(stderr, " [brstate st=%p f28=%02x f29=%02x a0=%08x vt=%08x]",
++        fprintf(stderr, " [brstate st=%08" PRIx32 " f28=%02x f29=%02x a0=%08x vt=%08x]",
+                 sptr, s28 & 0xff, s29 & 0xff, sa0, s24);
+     }
+     {
+diff --git a/emulator/machine/hw/arm/nano7_lcd.h b/emulator/machine/hw/arm/nano7_lcd.h
+index c63d5f2..e7521fd 100644
+--- a/emulator/machine/hw/arm/nano7_lcd.h
++++ b/emulator/machine/hw/arm/nano7_lcd.h
+@@ -4,8 +4,8 @@
+  *
+  * SPDX-License-Identifier: GPL-2.0-or-later
+  */
+-#ifndef NANO7_LCD_H
+-#define NANO7_LCD_H
++#ifndef NANO7_LCD_H_INCLUDED
++#define NANO7_LCD_H_INCLUDED
+ 
+ #include "exec/memory.h"
+ 

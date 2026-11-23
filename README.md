@@ -11,6 +11,10 @@ jailbreak - the modified image runs on the nano's native hardware.
 Status: work in progress. Tested against one specific stock build; treat
 everything here as experimental.
 
+The independent Linux track starts with a RAM-only BusyBox image tested in ARM
+QEMU. The emulator and Windows USB diagnostic work while the iPod stays in
+normal mode. See [Linux bring-up](docs/LINUX.md) and [USB notes](docs/DFU_NOTES.md).
+
 Jump to: [Flashing](#flashing-the-image) - [If DFU will not engage](#if-dfu-will-not-engage) - [Building](#building-the-image) - [Restoring stock](#restoring-stock) - [Open an issue](#feedback)
 
 ---
