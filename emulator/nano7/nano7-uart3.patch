@@ -1,0 +1,77 @@
+diff --git a/emulator/machine/hw/arm/nano7.c b/emulator/machine/hw/arm/nano7.c
+index a6db8b9..2306bc1 100644
+--- a/emulator/machine/hw/arm/nano7.c
++++ b/emulator/machine/hw/arm/nano7.c
+@@ -29,6 +29,7 @@
+ #include "qapi/error.h"
+ #include "qemu/error-report.h"
+ #include "exec/address-spaces.h"
++#include "chardev/char-fe.h"
+ #include "hw/boards.h"
+ #include "hw/core/cpu.h"
+ #include "hw/loader.h"
+@@ -72,6 +73,35 @@
+ #define NANO7_IRAM_BASE  0x22000000
+ #define NANO7_IRAM_SIZE  (256 * KiB)
+ #define NANO7_IRAM_VEC_SIZE 0x1000
++#define NANO7_UART3_BASE 0x3dd00000
++
++/* Polled UART3 transmit path for serial diagnostics. */
++static uint64_t nano7_uart3_read(void *opaque, hwaddr offset, unsigned size)
++{
++    /* UTRSTAT reports an empty transmit buffer and shifter. */
++    return offset == 0x10 ? 0x06 : 0;
++}
++
++static void nano7_uart3_write(void *opaque, hwaddr offset, uint64_t value,
++                             unsigned size)
++{
++    CharBackend *serial = opaque;
++    uint8_t byte = value;
++
++    if (offset == 0x20) {
++        qemu_chr_fe_write_all(serial, &byte, 1);
++    }
++}
++
++static const MemoryRegionOps nano7_uart3_ops = {
++    .read = nano7_uart3_read,
++    .write = nano7_uart3_write,
++    .endianness = DEVICE_LITTLE_ENDIAN,
++    .valid.min_access_size = 1,
++    .valid.max_access_size = 4,
++    .impl.min_access_size = 1,
++    .impl.max_access_size = 4,
++};
+ 
+ #define NANO7_IRQ_TIMER  8
+ #define NANO7_IRQ_FMSS   54   /* FMSS sequencer done (ISR 0x8161e8c) */
+@@ -92,6 +122,8 @@ struct Nano7MachineState {
+     uint64_t extra_dram;     /* 0 none, 1 open bus RAZ/WI, 2 own RAM, 3 alias */
+     MemoryRegion vrom;
+     MemoryRegion rng_mr;     /* 0x3c100000 random number generator */
++    MemoryRegion uart3_mr;
++    CharBackend uart3;
+ 
+     char *bootrom;
+     char *os_image;
+@@ -681,6 +713,11 @@ static void nano7_init(MachineState *machine)
+                                  qdev_get_gpio_in(DEVICE(s->cpu), ARM_CPU_FIQ));
+     nano7_timer_attach(get_system_memory(), 0x3c700000,
+                        s->vic_in[NANO7_IRQ_TIMER], s->usec_base);
++    qemu_chr_fe_init(&s->uart3, serial_hd(0), &error_fatal);
++    memory_region_init_io(&s->uart3_mr, OBJECT(s), &nano7_uart3_ops,
++                          &s->uart3, "nano7.uart3", 0x3c);
++    memory_region_add_subregion(get_system_memory(), NANO7_UART3_BASE,
++                                &s->uart3_mr);
+     /* 0x3de00000: serial register-command engine, completion on IRQ 52 */
+     nano7_spicmd_attach(get_system_memory(), 0x3de00000,
+                         s->vic_in[NANO7_IRQ_SPICMD]);
+@@ -1290,6 +1327,7 @@ static void nano7_instance_finalize(Object *obj)
+ {
+     Nano7MachineState *s = NANO7_MACHINE(obj);
+ 
++    qemu_chr_fe_deinit(&s->uart3, false);
+     g_free(s->bootrom);
+     g_free(s->os_image);
+     g_free(s->iram_image);

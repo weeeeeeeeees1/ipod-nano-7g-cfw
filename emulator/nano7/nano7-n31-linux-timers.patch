@@ -1,0 +1,236 @@
+diff --git a/emulator/machine/hw/arm/nano7.c b/emulator/machine/hw/arm/nano7.c
+index 2306bc1..8238d3d 100644
+--- a/emulator/machine/hw/arm/nano7.c
++++ b/emulator/machine/hw/arm/nano7.c
+@@ -104,6 +104,7 @@ static const MemoryRegionOps nano7_uart3_ops = {
+ };
+ 
+ #define NANO7_IRQ_TIMER  8
++#define NANO7_IRQ_TIMER_E 7
+ #define NANO7_IRQ_FMSS   54   /* FMSS sequencer done (ISR 0x8161e8c) */
+ 
+ #define NANO7_STUB_INSN  0xeafffffe /* ARM "b ." infinite loop */
+@@ -124,6 +125,7 @@ struct Nano7MachineState {
+     MemoryRegion rng_mr;     /* 0x3c100000 random number generator */
+     MemoryRegion uart3_mr;
+     CharBackend uart3;
++    bool n31_linux_timers;
+ 
+     char *bootrom;
+     char *os_image;
+@@ -712,7 +714,8 @@ static void nano7_init(MachineState *machine)
+                                  qdev_get_gpio_in(DEVICE(s->cpu), ARM_CPU_IRQ),
+                                  qdev_get_gpio_in(DEVICE(s->cpu), ARM_CPU_FIQ));
+     nano7_timer_attach(get_system_memory(), 0x3c700000,
+-                       s->vic_in[NANO7_IRQ_TIMER], s->usec_base);
++                       s->vic_in[NANO7_IRQ_TIMER], s->usec_base,
++                       s->n31_linux_timers ? s->vic_in[NANO7_IRQ_TIMER_E] : NULL);
+     qemu_chr_fe_init(&s->uart3, serial_hd(0), &error_fatal);
+     memory_region_init_io(&s->uart3_mr, OBJECT(s), &nano7_uart3_ops,
+                           &s->uart3, "nano7.uart3", 0x3c);
+@@ -1372,6 +1375,16 @@ static void nano7_machine_reset(MachineState *ms, ShutdownCause reason)
+     qemu_devices_reset(reason);
+ }
+ 
++static bool nano7_get_n31_linux_timers(Object *obj, Error **errp)
++{
++    return NANO7_MACHINE(obj)->n31_linux_timers;
++}
++
++static void nano7_set_n31_linux_timers(Object *obj, bool enabled, Error **errp)
++{
++    NANO7_MACHINE(obj)->n31_linux_timers = enabled;
++}
++
+ static void nano7_machine_class_init(ObjectClass *oc, void *data)
+ {
+     MachineClass *mc = MACHINE_CLASS(oc);
+@@ -1390,6 +1403,12 @@ static void nano7_machine_class_init(ObjectClass *oc, void *data)
+     mc->ignore_memory_transaction_failures = true;
+     mc->default_ram_size = NANO7_DRAM_SIZE;
+ 
++    object_class_property_add_bool(oc, "n31-linux-timers",
++                                   nano7_get_n31_linux_timers,
++                                   nano7_set_n31_linux_timers);
++    object_class_property_set_description(oc, "n31-linux-timers",
++                                          "Timer E and timer64 behavior for N31 Linux");
++
+     object_class_property_add_str(oc, "bootrom",
+                                   nano7_get_bootrom, nano7_set_bootrom);
+     object_class_property_set_description(oc, "bootrom",
+diff --git a/emulator/machine/hw/arm/nano7_timer.c b/emulator/machine/hw/arm/nano7_timer.c
+index 54d1f21..0a6a346 100644
+--- a/emulator/machine/hw/arm/nano7_timer.c
++++ b/emulator/machine/hw/arm/nano7_timer.c
+@@ -35,7 +35,11 @@
+ #define TMR_SIZE        0x1000
+ #define TMR_NCH         8
+ #define TMR_TSTAT       0x118
++#define TMR_IRQSTAT     0x10000
++#define TMR_CH_E        4
++#define TMR_E_PENDING   0x07000000u
+ #define TMR_HZ          3000000ULL
++#define TMR_LINUX_E_HZ  24000000ULL
+ #define TMR_MIN_NS      10000       /* clamp: at most 100 kHz of IRQs */
+ #define TMR_LOG_MAX     200
+ 
+@@ -52,12 +56,14 @@ typedef struct Nano7TimerChan {
+ 
+ struct Nano7TimerState {
+     MemoryRegion mr;
++    MemoryRegion irqstat_mr;
+     hwaddr base;
+     Nano7TimerChan ch[TMR_NCH];
+     uint32_t tstat;
+     uint32_t regs[TMR_SIZE / 4];
+     bool written[TMR_SIZE / 4];
+     qemu_irq irq;
++    qemu_irq linux_timer_e_irq;
+     uint64_t usec_base;
+     unsigned log_lines;
+ };
+@@ -102,19 +108,31 @@ static int tmr_tstat_shift(int n)
+     return (7 - n) * 8;
+ }
+ 
++static uint64_t tmr_rate(Nano7TimerChan *c)
++{
++    return c->n == TMR_CH_E && c->s->linux_timer_e_irq ?
++           TMR_LINUX_E_HZ : TMR_HZ;
++}
++
+ static int64_t tmr_period_ns(Nano7TimerChan *c)
+ {
+     uint64_t ticks = (uint64_t)MAX(c->data0, 1) * ((uint64_t)c->pre + 1);
+-    int64_t ns = muldiv64(ticks, NANOSECONDS_PER_SECOND, TMR_HZ);
++    int64_t ns = muldiv64(ticks, NANOSECONDS_PER_SECOND, tmr_rate(c));
+ 
+     return MAX(ns, TMR_MIN_NS);
+ }
+ 
+ static void tmr_update(Nano7TimerState *s)
+ {
+-    bool level = s->tstat != 0;
++    uint32_t shared_pending = s->tstat;
++    bool level;
+     int n;
+ 
++    if (s->linux_timer_e_irq) {
++        qemu_set_irq(s->linux_timer_e_irq, (s->tstat & TMR_E_PENDING) != 0);
++        shared_pending &= ~TMR_E_PENDING;
++    }
++    level = shared_pending != 0;
+     for (n = 0; n < 4; n++) {
+         level |= (s->ch[n].con & 0x70000) != 0;
+     }
+@@ -137,6 +155,11 @@ static void tmr_expire(void *opaque)
+     } else {
+         s->tstat |= en << tmr_tstat_shift(c->n);
+     }
++    if (c->n == TMR_CH_E && s->linux_timer_e_irq) {
++        c->cmd &= ~1u; /* N31 Linux programs Timer E as a one-shot. */
++        tmr_update(s);
++        return;
++    }
+     c->start_ns += tmr_period_ns(c);
+     /* don't try to catch up after a long host stall */
+     if (c->start_ns + tmr_period_ns(c) <
+@@ -153,8 +176,11 @@ static void tmr_expire(void *opaque)
+  * until stable and splits the value with /1000/1000 into {s, ms}.
+  * usec_base lets a snapshot resume continue near the dumped uptime.
+  */
+-static uint64_t tmr_usec(Nano7TimerState *s)
++static uint64_t tmr_free_running_ticks(Nano7TimerState *s)
+ {
++    if (s->linux_timer_e_irq) {
++        return s->usec_base * 2 + nano7_now_ns() / 500;
++    }
+     return s->usec_base + nano7_now_ns() / 1000;
+ }
+ 
+@@ -164,11 +190,10 @@ static uint64_t tmr_read(void *opaque, hwaddr offset, unsigned size)
+     hwaddr reg;
+     int n;
+ 
+-    if (offset == 0x84 || offset == 0xb4) {
+-        return (uint32_t)tmr_usec(s);
+-    }
+-    if (offset == 0x80) {
+-        return (uint32_t)(tmr_usec(s) >> 32);
++    if (offset == 0x80 || offset == 0x84 ||
++        (offset == 0xb4 && !s->linux_timer_e_irq)) {
++        uint64_t ticks = tmr_free_running_ticks(s);
++        return offset == 0x80 ? (uint32_t)(ticks >> 32) : (uint32_t)ticks;
+     }
+     if (offset == TMR_TSTAT) {
+         return s->tstat;
+@@ -187,7 +212,7 @@ static uint64_t tmr_read(void *opaque, hwaddr offset, unsigned size)
+             if (c->cmd & 1) {
+                 int64_t el = nano7_now_ns() -
+                              c->start_ns;
+-                return muldiv64(MAX(el, 0), TMR_HZ,
++                return muldiv64(MAX(el, 0), tmr_rate(c),
+                                 NANOSECONDS_PER_SECOND * (c->pre + 1));
+             }
+             return 0;
+@@ -263,6 +288,20 @@ static const MemoryRegionOps tmr_ops = {
+     .impl = { .min_access_size = 4, .max_access_size = 4 },
+ };
+ 
++static uint64_t tmr_irqstat_read(void *opaque, hwaddr offset, unsigned size)
++{
++    Nano7TimerState *s = opaque;
++
++    return s->tstat;
++}
++
++static const MemoryRegionOps tmr_irqstat_ops = {
++    .read = tmr_irqstat_read,
++    .endianness = DEVICE_LITTLE_ENDIAN,
++    .valid = { .min_access_size = 4, .max_access_size = 4 },
++    .impl = { .min_access_size = 4, .max_access_size = 4 },
++};
++
+ static const VMStateDescription vmstate_tmr_chan = {
+     .name = "nano7-timer-chan",
+     .version_id = 1,
+@@ -303,13 +342,14 @@ static const VMStateDescription vmstate_tmr = {
+ };
+ 
+ void nano7_timer_attach(MemoryRegion *parent, hwaddr base, qemu_irq irq,
+-                        uint64_t usec_base)
++                        uint64_t usec_base, qemu_irq linux_timer_e_irq)
+ {
+     Nano7TimerState *s = g_new0(Nano7TimerState, 1);
+     int n;
+ 
+     s->base = base;
+     s->irq = irq;
++    s->linux_timer_e_irq = linux_timer_e_irq;
+     s->usec_base = usec_base;
+     for (n = 0; n < TMR_NCH; n++) {
+         s->ch[n].s = s;
+@@ -321,4 +361,11 @@ void nano7_timer_attach(MemoryRegion *parent, hwaddr base, qemu_irq irq,
+     vmstate_register_any(NULL, &vmstate_tmr, s);
+     memory_region_init_io(&s->mr, NULL, &tmr_ops, s, "nano7.tmr", TMR_SIZE);
+     memory_region_add_subregion_overlap(parent, base, &s->mr, 0);
++    if (linux_timer_e_irq) {
++        memory_region_init_io(&s->irqstat_mr, NULL, &tmr_irqstat_ops, s,
++                              "nano7.tmr-irqstat", 4);
++        memory_region_set_readonly(&s->irqstat_mr, true);
++        memory_region_add_subregion_overlap(parent, base + TMR_IRQSTAT,
++                                            &s->irqstat_mr, 0);
++    }
+ }
+diff --git a/emulator/machine/hw/arm/nano7_timer.h b/emulator/machine/hw/arm/nano7_timer.h
+index b9ad4e4..b67d38f 100644
+--- a/emulator/machine/hw/arm/nano7_timer.h
++++ b/emulator/machine/hw/arm/nano7_timer.h
+@@ -11,6 +11,6 @@
+ #include "hw/irq.h"
+ 
+ void nano7_timer_attach(MemoryRegion *parent, hwaddr base, qemu_irq irq,
+-                        uint64_t usec_base);
++                        uint64_t usec_base, qemu_irq linux_timer_e_irq);
+ 
+ #endif
