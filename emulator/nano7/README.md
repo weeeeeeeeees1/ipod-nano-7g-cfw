@@ -6,6 +6,8 @@ UART3 and N31 timer patches.
 See [Phase 3 Linux boot](LINUX-BOOT.md) for the N31 kernel and BusyBox test.
 See [Phase 4 display and controls](DISPLAY-CONTROLS.md) for the LCD, touch,
 and button test.
+See [Phase 5 audio and volume persistence](AUDIO-STORAGE.md) for the WAV
+player and NAND restart check.
 
 ## Build on Debian 12
 
