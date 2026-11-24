@@ -8,6 +8,8 @@ See [Phase 4 display and controls](DISPLAY-CONTROLS.md) for the LCD, touch,
 and button test.
 See [Phase 5 audio and volume persistence](AUDIO-STORAGE.md) for the WAV
 player and NAND restart check.
+See the [Windows-hosted release](release/README.md) for the launcher,
+portable runtime, and end-to-end checks.
 
 ## Build on Debian 12
 
