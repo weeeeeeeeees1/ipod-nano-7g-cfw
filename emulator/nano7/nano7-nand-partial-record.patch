@@ -1,0 +1,48 @@
+diff --git a/emulator/machine/hw/arm/nano7_fmc.c b/emulator/machine/hw/arm/nano7_fmc.c
+index 0780225..8143afb 100644
+--- a/emulator/machine/hw/arm/nano7_fmc.c
++++ b/emulator/machine/hw/arm/nano7_fmc.c
+@@ -293,17 +293,18 @@ static int64_t nand_insert(NandStore *n, uint32_t ce, uint32_t addr,
+ static void nand_reindex(NandStore *n)
+ {
+     NandHdr h;
+-    uint32_t i;
+     off_t size = lseek(n->fd, 0, SEEK_END);
+ 
+     g_hash_table_remove_all(n->idx);
+-    for (i = 0; i < size / NAND_REC; i++) {
+-        if (pread(n->fd, &h, sizeof(h), (off_t)i * NAND_REC) == sizeof(h) &&
++    /* Older stores can end after the last programmed sector of a page. */
++    for (off_t offset = 0; size - offset >= (off_t)sizeof(h);
++         offset += NAND_REC) {
++        if (pread(n->fd, &h, sizeof(h), offset) == sizeof(h) &&
+             h.magic == NAND_MAGIC) {
+-            nand_insert(n, h.ce, h.addr, i);
++            nand_insert(n, h.ce, h.addr, offset / NAND_REC);
+         }
+     }
+-    n->slots = size / NAND_REC;
++    n->slots = size > 0 ? (size - 1) / NAND_REC + 1 : 0;
+ }
+ 
+ static void nand_open(NandStore *n, const char *path)
+@@ -346,10 +347,15 @@ static void nand_end(Nano7FmcState *s)
+ {
+     NandStore *n = &s->nand;
+ 
+-    if (n->mode == NAND_PROG && n->slot >= 0 &&
+-        pwrite(n->fd, &n->cur, sizeof(n->cur), n->slot * NAND_REC) !=
+-        sizeof(n->cur)) {
+-        fmc_log(s, "NAND store write failed: %s", strerror(errno));
++    if (n->mode == NAND_PROG && n->slot >= 0) {
++        off_t offset = n->slot * NAND_REC;
++        off_t end = lseek(n->fd, 0, SEEK_END);
++
++        if (end < 0 ||
++            (end < offset + NAND_REC && ftruncate(n->fd, offset + NAND_REC)) ||
++            pwrite(n->fd, &n->cur, sizeof(n->cur), offset) != sizeof(n->cur)) {
++            fmc_log(s, "NAND store write failed: %s", strerror(errno));
++        }
+     }
+     n->mode = NAND_IDLE;
+ }
