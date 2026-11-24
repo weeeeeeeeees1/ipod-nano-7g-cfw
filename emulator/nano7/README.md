@@ -3,6 +3,8 @@
 See the [Phase 2 board smoke test](BOARD-SMOKE.md) for the guest and the
 UART3 and N31 timer patches.
 
+See [Phase 3 Linux boot](LINUX-BOOT.md) for the N31 kernel and BusyBox test.
+
 ## Build on Debian 12
 
 These steps use NanoEmu commit `b9bc90a9d74b07d0e598598e86ee605344607048`
