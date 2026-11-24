@@ -4,6 +4,8 @@ See the [Phase 2 board smoke test](BOARD-SMOKE.md) for the guest and the
 UART3 and N31 timer patches.
 
 See [Phase 3 Linux boot](LINUX-BOOT.md) for the N31 kernel and BusyBox test.
+See [Phase 4 display and controls](DISPLAY-CONTROLS.md) for the LCD, touch,
+and button test.
 
 ## Build on Debian 12
 
