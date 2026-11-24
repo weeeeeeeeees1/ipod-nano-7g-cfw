@@ -87,6 +87,12 @@ def verify(qemu, guest, output):
     serial = output / "display-controls.serial.log"
     serial.unlink(missing_ok=True)
     pixels = expected_pixels()
+    rotated = b"".join(
+        pixels[offset:offset + 3]
+        for x in range(WIDTH)
+        for y in range(HEIGHT - 1, -1, -1)
+        for offset in [3 * (y * WIDTH + x)]
+    )
     with tempfile.TemporaryDirectory(prefix="nano7-display-") as directory:
         root = Path(directory)
         (root / "guest.bin").write_bytes(guest.read_bytes())
@@ -126,12 +132,6 @@ def verify(qemu, guest, output):
                                                f"B {button} {int(pressed)}")
                         command(stream, "input-send-event", {"events": [key_event("f7", True)]})
                         command(stream, "input-send-event", {"events": [key_event("f7", False)]})
-                        rotated = b"".join(
-                            pixels[offset:offset + 3]
-                            for x in range(WIDTH)
-                            for y in range(HEIGHT - 1, -1, -1)
-                            for offset in [3 * (y * WIDTH + x)]
-                        )
                         check_console(stream, root, rotated, HEIGHT, WIDTH)
                         x, y = TARGETS[0]
                         rotated_target = pointer(HEIGHT - 1 - y, x, HEIGHT, WIDTH)
