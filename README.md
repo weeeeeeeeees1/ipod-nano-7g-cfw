@@ -44,3 +44,7 @@ See the [hardware observations](docs/DFU_NOTES.md).
 The emulator work builds on [NanoEmu](https://github.com/tenspav/NanoEmu),
 [QEMU](https://www.qemu.org/), and [freemyipod's Linux port](https://github.com/freemyipod/linux).
 Earlier hardware research references ipod_sun and freemyipod.
+
+For work on a physical device, use the [read-only USB checker](docs/DFU_NOTES.md#collect-a-report),
+the [N31 payload handoff](hardware/n31/README.md), and the
+[physical boot evidence guide](docs/PHYSICAL-BOOT.md).

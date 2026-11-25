@@ -1,11 +1,43 @@
 import { execFile } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { setTimeout } from 'node:timers/promises';
-import { promisify } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 
-const seconds = Number(process.argv[2] ?? 0);
-if (!Number.isInteger(seconds) || seconds < 0 || seconds > 3600) {
-    console.error('Usage: node diagnostics/watch-nano-usb.mjs [seconds from 0 to 3600]');
+const usage = 'Usage: node diagnostics/watch-nano-usb.mjs [seconds] [--model MODEL] [--firmware VERSION]';
+let options;
+try {
+    options = parseArgs({
+        allowPositionals: true,
+        options: {
+            help: { type: 'boolean', short: 'h' },
+            model: { type: 'string' },
+            firmware: { type: 'string' },
+        },
+    });
+} catch (error) {
+    console.error(error.message);
+    console.error(usage);
+    process.exit(2);
+}
+const seconds = Number(options.positionals[0] ?? 0);
+if (options.values.help) {
+    console.log(usage);
+    console.log('Omit seconds for a snapshot. Use 1–3600 to watch for USB changes.');
+    console.log('Model and firmware are optional values transcribed from the iPod About screen.');
+    process.exit(0);
+}
+if (options.positionals.length > 1 || !Number.isInteger(seconds) || seconds < 0 || seconds > 3600) {
+    console.error(usage);
+    process.exit(2);
+}
+const reportedDevice = Object.fromEntries(
+    ['model', 'firmware'].flatMap(field => {
+        const value = options.values[field]?.trim();
+        return value ? [[field, value]] : [];
+    }),
+);
+if (Object.values(reportedDevice).some(value => value.length > 80 || /[\x00-\x1f\x7f]/.test(value))) {
+    console.error('Use a single line up to 80 characters for each About value.');
     process.exit(2);
 }
 if (process.platform !== 'win32') {
@@ -29,6 +61,8 @@ do {
             timestamp: new Date().toISOString(),
             appleUsbIds: ids,
             nanoNormalMode: ids.includes('05AC:1267'),
+            appleDfuIdSeen: ids.includes('05AC:1234'),
+            ...(Object.keys(reportedDevice).length ? { reportedDevice } : {}),
         }));
         previous = current;
     }
