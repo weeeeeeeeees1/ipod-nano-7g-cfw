@@ -18,6 +18,10 @@ The portable Windows x64 preview needs no iPod, Apple firmware, or separate Node
 | Audio | Captures a test WAV and checks volume persistence in emulated storage. |
 | Check | Runs the automated Linux, display, input, and audio checks. |
 
+![NanoEmu display test pattern](assets/nano7-display-demo.png)
+
+The image shows the separate Display demo guest.
+
 See the [Windows guide](emulator/nano7/release/README.md) for controls, troubleshooting, and logs.
 
 ## Build or contribute
@@ -26,6 +30,10 @@ See the [Windows guide](emulator/nano7/release/README.md) for controls, troubles
 - [Build the N31 kernel and boot BusyBox](emulator/nano7/LINUX-BOOT.md)
 - [Build and package the Windows preview](emulator/nano7/release/BUILD.md)
 - [Report issues and contribute](CONTRIBUTING.md)
+
+## Project status
+
+See [preview status](docs/PREVIEW.md) for verified features, limits, and the remaining binary distribution work.
 
 ## Hardware status
 

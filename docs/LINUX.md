@@ -41,7 +41,7 @@ play/pause are disabled because of I²C polling problems.
 
 On a Linux build host with kernel build dependencies and an ARM hard-float
 cross-compiler, use the pinned upstream checkout to prepare the kernel and
-device tree. These build commands have not been run on this Windows host:
+device tree. Use the [verified N31 build and boot guide](../emulator/nano7/LINUX-BOOT.md) for the full test. The underlying build commands are:
 
 ```sh
 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- O=out-n31 apple_n31_defconfig
@@ -50,8 +50,7 @@ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- O=out-n31 -j"$(nproc)" zImage s
 
 The N31 config uses `ttySAC0` for its serial console. The RAM-only initramfs
 needs no NAND root filesystem. Starting the kernel on physical hardware
-requires a supported launch path. The connected unit is currently in normal
-USB mode, and a native launch path for that state has yet to be verified.
+requires a supported launch path. A supported stock-device launch path remains unverified.
 
 The hardware acceptance test starts with a kernel log and BusyBox prompt.
 Then verify the framebuffer and volume key events, followed by headphone
