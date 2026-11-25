@@ -33,39 +33,15 @@ contains a small Linux runtime and uses software emulation on Windows.
 It requires no connected iPod or DFU. Stock RetailOS boot and installing
 software on a physical Nano are outside this release's coverage.
 
-## Rebuild from source
+## Troubleshooting
 
-Use the patched NanoEmu revision from the Phase 1–5 build guides, an
-N31 kernel build from freemyipod Linux commit
-`043ef51472d3471d525fbb55248c84039946d5b7`, and the standalone Phase 3
-BusyBox initramfs. Use a Debian 12 x86-64 build host running its cloud
-kernel. The runtime builder takes its x86 kernel and matching modules
-from that host.
+- If the window closes before you can read it, open PowerShell in the
+  extracted folder and run `.\Start-Nano7.cmd check`.
+- On a slow host, set `$env:NANO7_TIMEOUT_SECONDS = '600'` in PowerShell
+  before launching. The default is 300 seconds. Display mode applies
+  the timeout until it is ready.
+- If the viewer does not open, connect to the loopback address printed by
+  the launcher. For a port conflict, set `$env:NANO7_VNC_PORT = '5910'`.
+- On failure, inspect `serial.log` and `host-qemu.log` in the run folder.
 
-```sh
-sudo apt-get install busybox-static cpio kmod gzip binutils \
-  gcc-arm-linux-gnueabihf python3.11 device-tree-compiler
-bash build-runtime.sh /path/to/qemu-system-arm /path/to/n31-build \
-  /path/to/n31-initramfs.cpio.gz /path/to/debian-runtime
-```
-
-Copy the runtime output to Windows and stage it against an extracted
-Windows x64 QEMU distribution. Prepare a directory with the standalone
-Windows x64 Node.js binary named `node.exe` and the matching Node.js
-`LICENSE` file. Verify the binary against Node.js's published SHA-256
-checksums. Optionally supply a standalone Windows VNC viewer. The
-portable build uses Node.js 24.22.3 and TigerVNC 1.16.2.
-
-```cmd
-node stage-windows.mjs QEMU_DIR DEBIAN_RUNTIME NODE_DIR RELEASE_DIR VNC_VIEWER.exe
-```
-
-Source and dependency references:
-
-- [NanoEmu source at the pinned revision](https://github.com/tenspav/NanoEmu/tree/b9bc90a9d74b07d0e598598e86ee605344607048)
-- [QEMU 9.1.2 source used for NanoEmu](https://download.qemu.org/qemu-9.1.2.tar.xz)
-- [Windows QEMU builds and sources](https://qemu.weilnetz.de/w64/2026/)
-- [freemyipod N31 Linux source](https://github.com/freemyipod/linux/tree/043ef51472d3471d525fbb55248c84039946d5b7)
-- [Debian source packages](https://sources.debian.org/)
-- [Node.js 24.22.3 binaries, checksums, and source](https://nodejs.org/en/blog/release/v24.22.3)
-- [TigerVNC 1.16.2 binaries and source](https://github.com/TigerVNC/tigervnc/releases/tag/v1.16.2)
+See the [build and packaging guide](BUILD.md) for source builds.

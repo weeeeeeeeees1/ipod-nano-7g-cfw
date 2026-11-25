@@ -40,6 +40,10 @@ async function run(mode, options) {
     if (display && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
         throw new Error('NANO7_VNC_PORT must be an integer between 1024 and 65535.');
     }
+    const timeoutSeconds = Number(process.env.NANO7_TIMEOUT_SECONDS ?? 300);
+    if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 2_147_483) {
+        throw new Error('NANO7_TIMEOUT_SECONDS must be an integer between 1 and 2147483.');
+    }
     const runs = resolve(process.env.NANO7_RUNS ?? join(root, 'runs'));
     await mkdir(runs, { recursive: true });
     const runDir = await mkdtemp(join(runs, `${mode}-`));
@@ -73,13 +77,22 @@ async function run(mode, options) {
             console.log(line);
             if (display && line === 'IO READY' && !ready) {
                 ready = true;
+                clearTimeout(timeout);
                 console.log(`VNC display ready at 127.0.0.1::${port}. Press Ctrl+C here to exit.`);
                 if (!options.includes('--no-viewer')) openViewer(port);
             }
         }
     });
-    const cancel = () => launcher.kill();
-    const timeout = display ? undefined : setTimeout(cancel, 300_000);
+    let interrupted = false;
+    let timedOut = false;
+    const cancel = () => {
+        interrupted = true;
+        launcher.kill();
+    };
+    const timeout = setTimeout(() => {
+        timedOut = true;
+        launcher.kill();
+    }, timeoutSeconds * 1000);
     process.once('SIGINT', cancel);
     let result;
     try {
@@ -93,7 +106,13 @@ async function run(mode, options) {
         await writeFile(join(runDir, 'serial.log'), serial.join('\n') + '\n');
         await writeFile(join(runDir, 'host-qemu.log'), errors.join(''));
     }
-    if (display && ready) return;
+    if (timedOut) {
+        throw new Error(`The ${mode} run timed out after ${timeoutSeconds} seconds. Logs are in ${runDir}`);
+    }
+    if (display && interrupted) return;
+    if (display && ready) {
+        throw new Error(`The display stopped unexpectedly (QEMU exit code: ${result}). Logs are in ${runDir}`);
+    }
     if (result !== 0 || !serial.includes(`NANO7_RESULT OK ${mode}`)) {
         throw new Error(`The ${mode} run did not complete. Logs are in ${runDir}`);
     }
